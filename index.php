@@ -210,30 +210,22 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                 </video>
 
                 <div id="player-error-overlay" class="absolute inset-0 bg-dark-900/95 backdrop-blur-md hidden flex-col items-center justify-center p-6 text-center z-20">
-                    <div class="size-16 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mb-3 text-2xl">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    <div class="size-16 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mb-3 text-2xl">
+                        <i class="fa-solid fa-circle-play"></i>
                     </div>
-                    <h3 class="text-base sm:text-lg font-bold text-white mb-1">تعذر تشغيل هذا البث مباشرة في المتصفح</h3>
+                    <h3 class="text-base sm:text-lg font-bold text-white mb-1">تعذر تشغيل هذا البث مباشرة</h3>
                     <p class="text-xs text-slate-400 max-w-md mb-4 leading-relaxed" id="error-details">
-                        سيرفر البث يتطلب مشغل وسائط متخصص (User-Agent IBO Player) أو يحظر البث المباشر داخل المتصفح. اختر طريقة التشغيل البديلة:
+                        يمكنك إعادة محاولة التشغيل فوراً أو اختيار قناة أخرى من القائمة:
                     </p>
                     <div class="flex flex-wrap items-center justify-center gap-2 max-w-lg">
-                        <button onclick="setStreamMode('proxy_hls')" class="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-dark-900 font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-cyan-500/20">
+                        <button onclick="reloadCurrentStream()" class="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-dark-900 font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-cyan-500/20">
+                            <i class="fa-solid fa-rotate-right"></i>
+                            <span>إعادة محاولة التشغيل</span>
+                        </button>
+                        <button onclick="setStreamMode('proxy_ts')" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition flex items-center gap-1.5">
                             <i class="fa-solid fa-bolt"></i>
-                            <span>تشغيل عبر بروكسي IBO Player (HLS)</span>
+                            <span>تحديث مشغل MPEG-TS</span>
                         </button>
-                        <button onclick="setStreamMode('proxy_ts')" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-server"></i>
-                            <span>بروكسي IBO (MPEG-TS)</span>
-                        </button>
-                        <button onclick="openInExternalApp()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-dark-900 font-bold text-xs transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-mobile-screen"></i>
-                            <span>فتح في VLC أو IBO Player</span>
-                        </button>
-                        <a id="http-switch-link" href="#" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-globe"></i>
-                            <span>فتح عبر HTTP المباشر</span>
-                        </a>
                     </div>
                 </div>
 
@@ -262,9 +254,9 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="openInExternalApp()" class="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-mobile-screen"></i>
-                        <span>فتح في VLC / IBO Player</span>
+                    <button type="button" onclick="reloadCurrentStream()" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white font-bold text-xs transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span>تحديث البث</span>
                     </button>
                     <a id="download-single-m3u" href="#" download="channel.m3u" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs transition flex items-center gap-1" title="تحميل ملف M3U لهذه القناة">
                         <i class="fa-solid fa-download"></i>
@@ -772,30 +764,6 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
             playStream(ch.url);
         }
 
-        function openInExternalApp() {
-            if (!currentChannel || !currentChannel.url) {
-                alert('يرجى اختيار قناة أولاً.');
-                return;
-            }
-            const modal = document.getElementById('external-app-modal');
-            document.getElementById('modal-stream-url').value = currentChannel.url;
-            document.getElementById('vlc-direct-link').href = `vlc://${currentChannel.url}`;
-            document.getElementById('download-channel-m3u').href = `api.php?action=channel_m3u&id=${encodeURIComponent(currentChannel.id)}`;
-            
-            // Android intent
-            const androidIntent = `intent:${currentChannel.url}#Intent;type=video/*;package=org.videolan.vlc;end`;
-            document.getElementById('android-intent-link').href = androidIntent;
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function closeExternalAppModal() {
-            const modal = document.getElementById('external-app-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-
         function clearSearch() {
             const input = document.getElementById('search-input');
             input.value = '';
@@ -833,50 +801,7 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
         }
     </script>
 
-    <!-- مودال التشغيل في التطبيقات الخارجية (VLC / IBO Player / OTT Navigator) -->
-    <div id="external-app-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-        <div class="bg-dark-900 border border-white/10 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4">
-            <div class="flex items-center justify-between border-b border-white/10 pb-3">
-                <h3 class="font-bold text-white text-base flex items-center gap-2">
-                    <i class="fa-solid fa-mobile-screen text-cyan-400"></i>
-                    <span>تشغيل في تطبيق خارجي</span>
-                </h3>
-                <button onclick="closeExternalAppModal()" class="text-slate-400 hover:text-white transition">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <p class="text-xs text-slate-300 leading-relaxed">
-                يمكنك تشغيل هذه القناة مباشرة في أي تطبيق مشغل وسائط على هاتفك أو حاسوبك (مثل <strong class="text-cyan-400">IBO Player</strong>, <strong class="text-amber-400">VLC</strong>, أو <strong class="text-blue-400">IPTV Smarters</strong>):
-            </p>
-
-            <div class="space-y-2">
-                <a id="vlc-direct-link" href="#" class="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-dark-900 font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20">
-                    <i class="fa-solid fa-play"></i>
-                    <span>فتح في مشغل VLC مباشرة (vlc://)</span>
-                </a>
-
-                <a id="android-intent-link" href="#" class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition flex items-center justify-center gap-2">
-                    <i class="fa-brands fa-android text-emerald-400"></i>
-                    <span>فتح في مشغلات أندرويد (Intent)</span>
-                </a>
-
-                <a id="download-channel-m3u" href="#" download="channel.m3u" class="w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-slate-200 font-bold text-xs transition flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-file-arrow-down text-cyan-400"></i>
-                    <span>تحميل ملف تشغيل M3U للقناة</span>
-                </a>
-            </div>
-
-            <div class="pt-2 border-t border-white/10">
-                <label class="block text-[11px] font-semibold text-slate-400 mb-1">رابط البث المباشر (يمكنك نسخه ولصقه في IBO Player):</label>
-                <div class="flex items-center gap-2">
-                    <input id="modal-stream-url" type="text" readonly class="w-full bg-dark-800 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-mono focus:outline-none select-all" dir="ltr">
-                    <button onclick="navigator.clipboard.writeText(document.getElementById('modal-stream-url').value); alert('تم نسخ رابط القناة!');" class="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-dark-900 font-bold text-xs rounded-xl transition shrink-0">
-                        <i class="fa-regular fa-copy"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
+    
     </div>
 </body>
 </html>
