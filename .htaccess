@@ -1,0 +1,19 @@
+# IPTV Web Player Pro - Apache Configuration
+AddDefaultCharset UTF-8
+
+# Protect config.json from direct browser downloads
+<Files "config.json">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Protect hidden files
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Allow CORS headers for media streaming
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+</IfModule>

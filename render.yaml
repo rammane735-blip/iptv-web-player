@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: iptv-player-pro
+    env: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: Dockerfile
