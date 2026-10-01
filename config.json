@@ -7,6 +7,6 @@
   "default_channel_id": "ch_1",
   "m3u_url": "http://s7099.x.pmline.cc:3082/get.php?username=532275452803140&password=23072187&type=m3u&output=mpegts",
   "last_sync": "2026-10-01 23:25:00",
-  "total_channels": 9521,
-  "total_groups": 120
+  "total_channels": 8903,
+  "total_groups": 136
 }
