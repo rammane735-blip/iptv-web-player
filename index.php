@@ -454,7 +454,13 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
         }
 
         let mpegtsPlayer = null;
-        let streamMode = localStorage.getItem('iptv_stream_mode') || 'proxy_ts'; // 'proxy_ts', 'direct', 'proxy_hls'
+        let streamMode = 'proxy_ts';
+        try {
+            if (localStorage.getItem('iptv_stream_mode') === 'proxy_hls') {
+                localStorage.setItem('iptv_stream_mode', 'proxy_ts');
+            }
+            streamMode = localStorage.getItem('iptv_stream_mode') || 'proxy_ts';
+        } catch(e) {}
 
         function setStreamMode(mode) {
             streamMode = mode;
