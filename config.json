@@ -2,11 +2,11 @@
   "admin_password_hash": "$2y$10$wE7/LqgD73W5y019GvR6f.TqR3jR5XmF6x5jTqf4Z/o2/aYf1x4.y",
   "admin_password_plain": "admin123",
   "site_title": "VIP IPTV Web Player Pro",
-  "announcement": "مرحباً بكم في منصة البث المباشر. استمتع بمشاهدة القنوات والأحداث الرياضية بجودة فائقة.",
+  "announcement": "مرحباً بكم في منصة البث المباشر. استمتع بمشاهدة القنوات والأحداث الرياضية بجودة فائقة مباشرة داخل المتصفح.",
   "announcement_active": true,
   "default_channel_id": "ch_1",
-  "m3u_url": "http://s7099.x.pmline.cc:3082/get.php?username=532275452803140&password=23072187&type=m3u&output=mpegts",
-  "last_sync": "2026-10-01 23:25:00",
-  "total_channels": 8903,
-  "total_groups": 136
+  "m3u_url": "http://rrntffpw.msupbelac.xyz/get.php?username=A5TKSBFB&password=L9CDMQ8W&type=m3u&output=mpegts",
+  "last_sync": "2026-10-02 01:58:00",
+  "total_channels": 2074,
+  "total_groups": 28
 }
