@@ -1,12 +1,99 @@
 <?php
 /**
  * IPTV Web Player Pro - API Handler
- * Handles authentication, M3U synchronization (with smart Xtream Codes API), settings, and paginated channel management.
+ * Handles authentication, M3U synchronization, streaming proxy, and paginated channel management.
  */
 
 declare(strict_types=1);
-session_start();
 
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+// 1. بروكسي البث الحي المباشر (يعمل فوراً دون session_start لتجنب القفل ودون أي JSON headers)
+if ($action === 'proxy') {
+    $streamUrl = filter_var($_GET['url'] ?? '', FILTER_VALIDATE_URL);
+    if (!$streamUrl) {
+        http_response_code(400);
+        die('Invalid Stream URL');
+    }
+
+    $ua = !empty($_GET['ua']) ? trim($_GET['ua']) : 'IBO Player';
+
+    while (ob_get_level()) {
+        @ob_end_clean();
+    }
+    @ini_set('output_buffering', 'off');
+    @ini_set('zlib.output_compression', 'off');
+    @set_time_limit(0);
+
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, OPTIONS, HEAD');
+    header('Access-Control-Allow-Headers: Content-Type, Range, Authorization, X-Requested-With');
+    header('Access-Control-Expose-Headers: Content-Length, Content-Range, Content-Type, Accept-Ranges');
+    header('Content-Type: video/mp2t');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Accept-Ranges: bytes');
+    header('X-Accel-Buffering: no');
+    if (function_exists('header_remove')) {
+        @header_remove('Content-Length');
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        exit;
+    }
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $streamUrl);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+    curl_setopt($ch, CURLOPT_USERAGENT, $ua);
+    curl_setopt($ch, CURLOPT_BUFFERSIZE, 65536);
+
+    if (isset($_SERVER['HTTP_RANGE'])) {
+        curl_setopt($ch, CURLOPT_RANGE, $_SERVER['HTTP_RANGE']);
+    }
+
+    curl_exec($ch);
+    curl_close($ch);
+    exit;
+}
+
+// 2. تحميل ملف M3U لقناة واحدة (دون JSON headers)
+if ($action === 'channel_m3u') {
+    define('CHANNELS_FILE_DIRECT', __DIR__ . '/channels.json');
+    $id = trim($_GET['id'] ?? '');
+    $raw = @file_get_contents(CHANNELS_FILE_DIRECT);
+    $channels = !empty($raw) ? json_decode($raw, true) : [];
+    $found = null;
+    if (is_array($channels)) {
+        foreach ($channels as $ch) {
+            if (($ch['id'] ?? '') === $id) {
+                $found = $ch;
+                break;
+            }
+        }
+        if (!$found && !empty($channels)) {
+            $found = $channels[0];
+        }
+    }
+    if ($found) {
+        $name = preg_replace('/[^a-zA-Z0-9_\-\x{0600}-\x{06FF}]/u', '_', $found['name'] ?? 'channel');
+        header('Content-Type: audio/x-mpegurl; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $name . '.m3u"');
+        echo "#EXTM3U\n";
+        echo '#EXTINF:-1 tvg-id="' . ($found['id'] ?? '') . '" tvg-name="' . ($found['name'] ?? '') . '" tvg-logo="' . ($found['logo'] ?? '') . '" group-title="' . ($found['group'] ?? '') . '",' . ($found['name'] ?? '') . "\n";
+        echo ($found['url'] ?? '') . "\n";
+        exit;
+    }
+    exit;
+}
+
+// باقي الإجراءات الإدارية وواجهة JSON
+session_start();
 header('Content-Type: application/json; charset=utf-8');
 
 define('CONFIG_FILE', __DIR__ . '/config.json');
@@ -179,89 +266,6 @@ if ($action === 'get_groups') {
         'total_hidden' => count($channels) - $totalVisible,
         'groups' => array_values($groups)
     ]);
-}
-
-// 5. بروكسي البث المتقدم مع دعم User-Agent الخاص بـ IBO Player و HLS
-if ($action === 'proxy') {
-    @session_write_close();
-
-    $streamUrl = filter_var($_GET['url'] ?? '', FILTER_VALIDATE_URL);
-    if (!$streamUrl) {
-        http_response_code(400);
-        die('Invalid URL');
-    }
-
-    $ua = !empty($_GET['ua']) ? trim($_GET['ua']) : 'IBO Player';
-
-    while (ob_get_level()) {
-        ob_end_clean();
-    }
-    @ini_set('output_buffering', 'off');
-    @ini_set('zlib.output_compression', 'off');
-    @set_time_limit(0);
-
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, OPTIONS, HEAD');
-    header('Access-Control-Allow-Headers: Content-Type, Range, Authorization, X-Requested-With');
-    header('Access-Control-Expose-Headers: Content-Length, Content-Range, Content-Type, Accept-Ranges');
-    header('Content-Type: video/mp2t');
-    header('Cache-Control: no-cache, no-store, must-revalidate');
-    header('Pragma: no-cache');
-    header('Accept-Ranges: bytes');
-    header('X-Accel-Buffering: no');
-    if (function_exists('header_remove')) {
-        @header_remove('Content-Length');
-    }
-
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        exit;
-    }
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $streamUrl);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 0);
-    curl_setopt($ch, CURLOPT_USERAGENT, $ua);
-    curl_setopt($ch, CURLOPT_BUFFERSIZE, 65536);
-
-    if (isset($_SERVER['HTTP_RANGE'])) {
-        curl_setopt($ch, CURLOPT_RANGE, $_SERVER['HTTP_RANGE']);
-    }
-
-    // Direct streaming to client
-    curl_exec($ch);
-    curl_close($ch);
-    exit;
-}
-
-// 5.1 تحميل ملف M3U لقناة واحدة لتشغيلها في مشغلات خارجية كـ VLC و IBO Player
-if ($action === 'channel_m3u') {
-    $id = trim($_GET['id'] ?? '');
-    $channels = getJsonData(CHANNELS_FILE, []);
-    $found = null;
-    foreach ($channels as $ch) {
-        if ($ch['id'] === $id) {
-            $found = $ch;
-            break;
-        }
-    }
-    if (!$found && !empty($channels)) {
-        $found = $channels[0];
-    }
-    if ($found) {
-        $name = preg_replace('/[^a-zA-Z0-9_\-\x{0600}-\x{06FF}]/u', '_', $found['name'] ?? 'channel');
-        header('Content-Type: audio/x-mpegurl; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $name . '.m3u"');
-        echo "#EXTM3U\n";
-        echo '#EXTINF:-1 tvg-id="' . ($found['id'] ?? '') . '" tvg-name="' . ($found['name'] ?? '') . '" tvg-logo="' . ($found['logo'] ?? '') . '" group-title="' . ($found['group'] ?? '') . '",' . ($found['name'] ?? '') . "\n";
-        echo ($found['url'] ?? '') . "\n";
-        exit;
-    }
-    exit;
 }
 
 // =========================================================================
