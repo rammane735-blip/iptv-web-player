@@ -183,6 +183,8 @@ if ($action === 'get_groups') {
 
 // 5. بروكسي البث المتقدم مع دعم User-Agent الخاص بـ IBO Player و HLS
 if ($action === 'proxy') {
+    @session_write_close();
+
     $streamUrl = filter_var($_GET['url'] ?? '', FILTER_VALIDATE_URL);
     if (!$streamUrl) {
         http_response_code(400);
@@ -191,7 +193,6 @@ if ($action === 'proxy') {
 
     $ua = !empty($_GET['ua']) ? trim($_GET['ua']) : 'IBO Player';
 
-    // تنظيف المخزن المؤقت للذاكرة لتمكين التدفق الفوري الحقيقي
     while (ob_get_level()) {
         ob_end_clean();
     }
@@ -203,75 +204,19 @@ if ($action === 'proxy') {
     header('Access-Control-Allow-Methods: GET, OPTIONS, HEAD');
     header('Access-Control-Allow-Headers: Content-Type, Range, Authorization, X-Requested-With');
     header('Access-Control-Expose-Headers: Content-Length, Content-Range, Content-Type, Accept-Ranges');
+    header('Content-Type: video/mp2t');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Accept-Ranges: bytes');
+    header('X-Accel-Buffering: no');
+    if (function_exists('header_remove')) {
+        @header_remove('Content-Length');
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         exit;
     }
 
-    $urlPath = parse_url($streamUrl, PHP_URL_PATH) ?? '';
-    $isM3u8Request = (substr(strtolower($urlPath), -5) === '.m3u8') || (isset($_GET['type']) && $_GET['type'] === 'm3u8');
-
-    if ($isM3u8Request) {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $streamUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_USERAGENT, $ua);
-
-        $body = curl_exec($ch);
-        $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL) ?: $streamUrl;
-        curl_close($ch);
-
-        // التحقق هل الرد هو بالفعل قائمة M3U8 نصية أم دفق فيديو ثنائي
-        if (is_string($body) && strpos(trim($body), '#EXTM3U') === 0) {
-            $parsed = parse_url($finalUrl);
-            $baseSchemeHost = ($parsed['scheme'] ?? 'http') . '://' . ($parsed['host'] ?? '');
-            if (!empty($parsed['port'])) {
-                $baseSchemeHost .= ':' . $parsed['port'];
-            }
-            $baseDir = rtrim(dirname($parsed['path'] ?? '/'), '/\\') . '/';
-
-            $lines = explode("\n", str_replace("\r", "", $body));
-            $outputLines = [];
-
-            foreach ($lines as $line) {
-                $trimmed = trim($line);
-                if (empty($trimmed) || $trimmed[0] === '#') {
-                    $outputLines[] = $line;
-                    continue;
-                }
-
-                if (strpos($trimmed, 'http://') === 0 || strpos($trimmed, 'https://') === 0) {
-                    $chunkUrl = $trimmed;
-                } elseif ($trimmed[0] === '/') {
-                    $chunkUrl = $baseSchemeHost . $trimmed;
-                } else {
-                    $chunkUrl = $baseSchemeHost . $baseDir . $trimmed;
-                }
-
-                $proxyChunk = 'api.php?action=proxy&ua=' . urlencode($ua) . '&url=' . urlencode($chunkUrl);
-                $outputLines[] = $proxyChunk;
-            }
-
-            header('Content-Type: application/vnd.apple.mpegurl; charset=utf-8');
-            header('Cache-Control: no-cache, no-store, must-revalidate');
-            echo implode("\n", $outputLines);
-            exit;
-        }
-        // إذا لم يكن نص M3U8 حقيقي، فهو دفق فيديو مباشر، نمرره كفيديو
-        if (is_string($body) && !empty($body)) {
-            header('Content-Type: video/mp2t');
-            header('Cache-Control: no-cache, no-store');
-            echo $body;
-            exit;
-        }
-    }
-
-    // بالنسبة لملفات وتدفقات البث MPEG-TS، نستخدم التدفق المباشر Chunk-by-Chunk
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $streamUrl);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -283,26 +228,11 @@ if ($action === 'proxy') {
     curl_setopt($ch, CURLOPT_USERAGENT, $ua);
     curl_setopt($ch, CURLOPT_BUFFERSIZE, 65536);
 
-    // تمرير هيدر Range إن وجد
     if (isset($_SERVER['HTTP_RANGE'])) {
         curl_setopt($ch, CURLOPT_RANGE, $_SERVER['HTTP_RANGE']);
     }
 
-    // هيدرز البث المباشر
-    header('Content-Type: video/mp2t');
-    header('Cache-Control: no-cache, no-store, must-revalidate');
-    header('Pragma: no-cache');
-    header('Accept-Ranges: bytes');
-    header('X-Accel-Buffering: no');
-
-    // تمرير دفق الفيديو مباشرة إلى المتصفح فور وصوله
-    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) {
-        echo $chunk;
-        @ob_flush();
-        @flush();
-        return strlen($chunk);
-    });
-
+    // Direct streaming to client
     curl_exec($ch);
     curl_close($ch);
     exit;
