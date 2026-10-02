@@ -10,7 +10,7 @@ on:
       livepeer_key:
         description: 'مفتاح البث Stream Key من حسابك في Livepeer Studio'
         required: true
-        default: ''
+        default: '73a8-7mnk-01qq-p6uw'
       max_hours:
         description: 'مدة البث بالساعات (افتراضي: 3 ساعات للمباراة والشوطين)'
         required: true
@@ -26,7 +26,7 @@ jobs:
       - name: ⚙️ Setup FFmpeg and Network Tools
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg curl
 
       - name: 🚀 Start Cloud Stream to Livepeer (No PC / No OBS Needed)
         run: |
@@ -34,25 +34,30 @@ jobs:
           echo "⚽ Starting Cloud Restream from IPTV to Livepeer..."
           echo "IPTV URL: ${{ github.event.inputs.stream_url }}"
           echo "Duration Limit: ${{ github.event.inputs.max_hours }} Hours"
+          echo "Livepeer Key: ${{ github.event.inputs.livepeer_key }}"
           echo "=========================================================="
 
-          # Calculate timeout in seconds
           HOURS="${{ github.event.inputs.max_hours }}"
           SECONDS_LIMIT=$(python3 -c "print(int(float('$HOURS') * 3600))")
-          
-          echo "Stream will run for up to $SECONDS_LIMIT seconds ($HOURS hours)."
+          END_TIME=$(( $(date +%s) + SECONDS_LIMIT ))
 
-          # Run FFmpeg with automatic reconnect and direct stream copy
-          timeout $SECONDS_LIMIT ffmpeg -hide_banner \
-            -reconnect 1 \
-            -reconnect_at_eof 1 \
-            -reconnect_streamed 1 \
-            -reconnect_delay_max 5 \
-            -user_agent "VLC/3.0.18 LibVLC/3.0.18" \
-            -i "${{ github.event.inputs.stream_url }}" \
-            -c:v copy \
-            -c:a copy \
-            -f flv "rtmp://rtmp.livepeer.com/live/${{ github.event.inputs.livepeer_key }}" || true
+          echo "Stream will run until $(date -d @$END_TIME) ($HOURS hours)."
+
+          while [ $(date +%s) -lt $END_TIME ]; do
+            echo "--------------------------------------------------------"
+            echo "🚀 Connecting IPTV stream to Livepeer RTMP..."
+            echo "--------------------------------------------------------"
+
+            curl -s -L -A "VLC/3.0.18 LibVLC/3.0.18" "${{ github.event.inputs.stream_url }}" | \
+              ffmpeg -hide_banner \
+                -f mpegts -i pipe:0 \
+                -c:v copy \
+                -c:a aac -b:a 128k \
+                -f flv "rtmp://rtmp.livepeer.com/live/${{ github.event.inputs.livepeer_key }}" || true
+
+            echo "Stream connection closed or interrupted. Reconnecting in 3 seconds..."
+            sleep 3
+          done
 
           echo "=========================================================="
           echo "✅ Match Stream session finished successfully."
