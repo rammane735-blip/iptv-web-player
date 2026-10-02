@@ -202,10 +202,12 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
             <div class="relative w-full aspect-video bg-dark-900 rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-cyan-950/20 flex items-center justify-center group">
                 
                 <video id="iptv-player" 
-                       class="video-js vjs-default-skin vjs-big-play-centered w-full h-full"
+                       class="w-full h-full rounded-2xl bg-black object-contain shadow-2xl"
                        controls 
+                       autoplay
                        preload="auto"
                        playsinline
+                       webkit-playsinline
                        poster="https://images.unsplash.com/photo-1593784991095-a205069470b6?q=80&w=1200&auto=format&fit=crop">
                 </video>
 
@@ -419,32 +421,15 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
         });
 
         function initVideoPlayer() {
-            try {
-                player = videojs('iptv-player', {
-                    autoplay: true,
-                    controls: true,
-                    responsive: true,
-                    fluid: true,
-                    liveui: true,
-                    html5: {
-                        vhs: {
-                            overrideNative: true
-                        }
-                    }
-                });
+            const videoEl = document.getElementById('iptv-player');
+            if (!videoEl) return;
 
-                player.on('error', function() {
-                    if (!mpegtsPlayer) {
-                        showPlayerError();
-                    }
-                });
-
-                player.on('playing', function() {
-                    hidePlayerError();
-                });
-            } catch (err) {
-                console.error("VideoJS Init Error:", err);
-            }
+            videoEl.addEventListener('playing', function() {
+                hidePlayerError();
+            });
+            videoEl.addEventListener('play', function() {
+                hidePlayerError();
+            });
         }
 
         let mpegtsPlayer = null;
@@ -491,29 +476,22 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                 mpegtsPlayer = null;
             }
 
-            const videoEl = document.getElementById('iptv-player_html5_api') || document.querySelector('video');
+            const videoEl = document.getElementById('iptv-player');
+            if (!videoEl) return;
 
             let finalUrl = streamUrl;
-            let isHls = false;
+            let isHls = streamUrl.toLowerCase().includes('.m3u8');
 
             if (streamMode === 'proxy_ts') {
-                finalUrl = 'api.php?action=proxy&ua=IPTVSmartersPro&url=' + encodeURIComponent(streamUrl);
-                isHls = false;
-            } else if (streamMode === 'proxy_hls') {
-                const hlsUrl = streamUrl.replace(/\.ts($|\?)/i, '.m3u8$1');
-                finalUrl = 'api.php?action=proxy&ua=IPTVSmartersPro&type=m3u8&url=' + encodeURIComponent(hlsUrl);
-                isHls = true;
-            } else {
-                // Direct
+                finalUrl = 'api.php?action=proxy&url=' + encodeURIComponent(streamUrl);
+            } else if (streamMode === 'direct') {
                 finalUrl = streamUrl;
-                isHls = streamUrl.toLowerCase().includes('.m3u8');
+            } else {
+                finalUrl = 'api.php?action=proxy&url=' + encodeURIComponent(streamUrl);
             }
 
             // 1. Play with mpegts.js (Recommended for MPEG-TS streams)
             if (!isHls && window.mpegts && mpegts.isSupported()) {
-                if (player) {
-                    player.reset();
-                }
                 try {
                     mpegtsPlayer = mpegts.createPlayer({
                         type: 'mpegts',
@@ -539,7 +517,9 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                     }
                     mpegtsPlayer.on(mpegts.Events.ERROR, function(type, detail, info) {
                         console.warn("mpegts error:", type, detail, info);
-                        showPlayerError();
+                        if (videoEl.paused || videoEl.readyState < 2) {
+                            showPlayerError();
+                        }
                     });
                     return;
                 } catch(err) {
@@ -547,40 +527,14 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                 }
             }
 
-            // 2. Play HLS using Video.js or Hls.js
-            if (isHls) {
-                if (player) {
-                    player.reset();
-                    player.src({
-                        src: finalUrl,
-                        type: 'application/x-mpegURL'
-                    });
-                    player.play().catch(e => console.log("HLS autoplay error:", e));
-                } else if (window.Hls && Hls.isSupported()) {
-                    const hls = new Hls({ enableWorker: true });
-                    hls.loadSource(finalUrl);
-                    hls.attachMedia(videoEl);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(e => console.log(e)));
-                    hls.on(Hls.Events.ERROR, (e, data) => {
-                        if (data.fatal) showPlayerError();
-                    });
-                } else if (videoEl && videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                    videoEl.src = finalUrl;
-                    videoEl.play().catch(e => console.log(e));
-                }
-                return;
-            }
-
-            // Fallback to Video.js / HTML5
-            if (player) {
-                player.src({
-                    src: finalUrl,
-                    type: isHls ? 'application/x-mpegURL' : 'video/mp2t'
+            // Fallback to HTML5
+            videoEl.src = finalUrl;
+            const p2 = videoEl.play();
+            if (p2 !== undefined) {
+                p2.catch(function(e) {
+                    videoEl.muted = true;
+                    videoEl.play().catch(function(err) { console.log(err); });
                 });
-                player.play().catch(e => console.log("Fallback play:", e));
-            } else if (videoEl) {
-                videoEl.src = finalUrl;
-                videoEl.play().catch(e => console.log(e));
             }
         }
 
