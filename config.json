@@ -5,8 +5,8 @@
   "announcement": "مرحباً بكم في منصة البث المباشر. استمتع بمشاهدة القنوات والأحداث الرياضية بجودة فائقة مباشرة داخل المتصفح.",
   "announcement_active": true,
   "default_channel_id": "ch_1",
-  "m3u_url": "http://rrntffpw.msupbelac.xyz/get.php?username=A5TKSBFB&password=L9CDMQ8W&type=m3u&output=mpegts",
-  "last_sync": "2026-10-02 01:58:00",
-  "total_channels": 2074,
-  "total_groups": 28
+  "m3u_url": "http://tv.business-cloud-4.ru/get.php?username=b48d9f42deab&password=9f8c5b1d06&type=m3u_plus&output=ts",
+  "last_sync": "2026-10-02 02:40:00",
+  "total_channels": 1134,
+  "total_groups": 31
 }
