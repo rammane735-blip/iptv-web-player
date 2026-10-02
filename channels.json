@@ -1,5 +1,29 @@
 [
   {
+    "id": "ch_1790965852_992",
+    "name": "🔴 بث مباشر - مباراة اليوم (Match 11)",
+    "logo": "https://cdn-icons-png.flaticon.com/512/3845/3845868.png",
+    "group": "المباريات المباشرة (Live Matches)",
+    "url": "https://livepeercdn.studio/hls/73a813ppexsxwzar/index.m3u8",
+    "visible": true
+  },
+  {
+    "id": "ch_1790964704_321",
+    "name": "test1",
+    "logo": "https://placehold.co/100x100/1e293b/38bdf8?text=test",
+    "group": "عام (General)",
+    "url": "http://200.32.231.178/ESPN_2/index.m3u8",
+    "visible": true
+  },
+  {
+    "id": "ch_1790963682_733",
+    "name": "test",
+    "logo": "https://placehold.co/100x100/1e293b/38bdf8?text=test",
+    "group": "عام (General)",
+    "url": "http://neoplayer4k18.me/miritest/a020a350d0/288529",
+    "visible": true
+  },
+  {
     "id": "ch_1",
     "name": "beIN SPORTS HD (Live)",
     "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/BeIN_Sports_logo.svg/320px-BeIN_Sports_logo.svg.png",
