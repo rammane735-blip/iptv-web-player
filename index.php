@@ -465,7 +465,7 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
             hidePlayerError();
             if (!streamUrl) return;
 
-            // Destroy previous mpegts player if any
+            // Destroy previous players if any
             if (mpegtsPlayer) {
                 try {
                     mpegtsPlayer.pause();
@@ -474,6 +474,12 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                     mpegtsPlayer.destroy();
                 } catch(e) {}
                 mpegtsPlayer = null;
+            }
+            if (window.hlsPlayerInstance) {
+                try {
+                    window.hlsPlayerInstance.destroy();
+                } catch(e) {}
+                window.hlsPlayerInstance = null;
             }
 
             const videoEl = document.getElementById('iptv-player');
@@ -524,6 +530,50 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                     return;
                 } catch(err) {
                     console.warn("mpegts init failed:", err);
+                }
+            }
+
+            // 2. Play HLS using Hls.js or native Apple HLS
+            if (isHls) {
+                if (window.Hls && Hls.isSupported()) {
+                    try {
+                        window.hlsPlayerInstance = new Hls({
+                            enableWorker: true,
+                            lowLatencyMode: true
+                        });
+                        window.hlsPlayerInstance.loadSource(finalUrl);
+                        window.hlsPlayerInstance.attachMedia(videoEl);
+                        window.hlsPlayerInstance.on(Hls.Events.MANIFEST_PARSED, function() {
+                            const p = videoEl.play();
+                            if (p !== undefined) {
+                                p.catch(function() {
+                                    videoEl.muted = true;
+                                    videoEl.play();
+                                });
+                            }
+                        });
+                        window.hlsPlayerInstance.on(Hls.Events.ERROR, function(event, data) {
+                            if (data.fatal) {
+                                console.warn("HLS fatal error:", data);
+                                if (videoEl.paused || videoEl.readyState < 2) {
+                                    showPlayerError();
+                                }
+                            }
+                        });
+                        return;
+                    } catch(err) {
+                        console.warn("Hls.js init error:", err);
+                    }
+                } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                    videoEl.src = finalUrl;
+                    const p = videoEl.play();
+                    if (p !== undefined) {
+                        p.catch(function() {
+                            videoEl.muted = true;
+                            videoEl.play();
+                        });
+                    }
+                    return;
                 }
             }
 
