@@ -434,7 +434,9 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                 });
 
                 player.on('error', function() {
-                    showPlayerError();
+                    if (!mpegtsPlayer) {
+                        showPlayerError();
+                    }
                 });
 
                 player.on('playing', function() {
@@ -495,11 +497,11 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
             let isHls = false;
 
             if (streamMode === 'proxy_ts') {
-                finalUrl = 'api.php?action=proxy&ua=IBO%20Player&url=' + encodeURIComponent(streamUrl);
+                finalUrl = 'api.php?action=proxy&ua=IPTVSmartersPro&url=' + encodeURIComponent(streamUrl);
                 isHls = false;
             } else if (streamMode === 'proxy_hls') {
                 const hlsUrl = streamUrl.replace(/\.ts($|\?)/i, '.m3u8$1');
-                finalUrl = 'api.php?action=proxy&ua=IBO%20Player&type=m3u8&url=' + encodeURIComponent(hlsUrl);
+                finalUrl = 'api.php?action=proxy&ua=IPTVSmartersPro&type=m3u8&url=' + encodeURIComponent(hlsUrl);
                 isHls = true;
             } else {
                 // Direct
