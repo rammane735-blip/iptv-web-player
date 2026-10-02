@@ -16,8 +16,9 @@ if ($action === 'proxy') {
         die('Invalid Stream URL');
     }
 
-    $ua = !empty($_GET['ua']) ? trim($_GET['ua']) : 'IBO Player';
+    $ua = !empty($_GET['ua']) ? trim($_GET['ua']) : 'IPTVSmartersPro';
 
+    @ignore_user_abort(false);
     while (ob_get_level()) {
         @ob_end_clean();
     }
@@ -29,7 +30,6 @@ if ($action === 'proxy') {
     header('Access-Control-Allow-Methods: GET, OPTIONS, HEAD');
     header('Access-Control-Allow-Headers: Content-Type, Range, Authorization, X-Requested-With');
     header('Access-Control-Expose-Headers: Content-Length, Content-Range, Content-Type, Accept-Ranges');
-    header('Content-Type: video/mp2t');
     header('Cache-Control: no-cache, no-store, must-revalidate');
     header('Pragma: no-cache');
     header('Accept-Ranges: bytes');
@@ -49,13 +49,31 @@ if ($action === 'proxy') {
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 0);
     curl_setopt($ch, CURLOPT_USERAGENT, $ua);
     curl_setopt($ch, CURLOPT_BUFFERSIZE, 65536);
 
     if (isset($_SERVER['HTTP_RANGE'])) {
         curl_setopt($ch, CURLOPT_RANGE, $_SERVER['HTTP_RANGE']);
     }
+
+    $isM3u8 = (bool)preg_match('/\.m3u8($|\?)/i', $streamUrl);
+    if ($isM3u8) {
+        header('Content-Type: application/vnd.apple.mpegurl');
+    } else {
+        header('Content-Type: video/mp2t');
+    }
+
+    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) {
+        if (connection_aborted()) {
+            return 0;
+        }
+        echo $chunk;
+        if (ob_get_level()) {
+            @ob_flush();
+        }
+        flush();
+        return strlen($chunk);
+    });
 
     curl_exec($ch);
     curl_close($ch);
@@ -213,7 +231,7 @@ if ($action === 'get_channels') {
             if ($status === 'hidden' && $isVisible) continue;
         }
 
-        if (!empty($group) && ($ch['group'] ?? '') !== $group) {
+        if (!empty($group) && $group !== 'ALL' && ($ch['group'] ?? '') !== $group) {
             continue;
         }
 
