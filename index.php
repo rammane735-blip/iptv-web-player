@@ -518,12 +518,12 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                         isLive: true,
                         url: finalUrl
                     }, {
-                        enableWorker: true,
+                        enableWorker: false,
                         lazyLoad: false,
                         liveBufferLatencyChasing: true,
                         autoCleanupSourceBuffer: true,
                         enableStashBuffer: false,
-                        seekType: 'range'
+                        stashInitialSize: 128
                     });
                     mpegtsPlayer.attachMediaElement(videoEl);
                     mpegtsPlayer.load();
@@ -584,7 +584,7 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
 
         // Fetch groups list
         function loadGroupsAndInitialChannels() {
-            fetch('api.php?action=get_groups')
+            fetch('api.php?action=get_groups&_t=' + Date.now())
                 .then(r => r.json())
                 .then(res => {
                     if (res.success && res.groups && res.groups.length > 0) {
@@ -635,7 +635,7 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
             `;
             document.getElementById('current-group-label').textContent = groupName;
 
-            fetch('api.php?action=get_channels&limit=250&group=' + encodeURIComponent(groupName))
+            fetch('api.php?action=get_channels&limit=250&group=' + encodeURIComponent(groupName) + '&_t=' + Date.now())
                 .then(r => r.json())
                 .then(res => {
                     if (res.success) {
@@ -667,7 +667,7 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                 </div>
             `;
 
-            fetch('api.php?action=get_channels&limit=150&q=' + encodeURIComponent(query))
+            fetch('api.php?action=get_channels&limit=150&q=' + encodeURIComponent(query) + '&_t=' + Date.now())
                 .then(r => r.json())
                 .then(res => {
                     if (res.success) {
