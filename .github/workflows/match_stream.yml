@@ -6,7 +6,7 @@ on:
       stream_url:
         description: 'رابط القناة من سيرفر الـ IPTV'
         required: true
-        default: 'http://sma3.cc:3350/532275452803140/23072187/304'
+        default: 'http://mbx4k.store:80/miritest/a020a350d0/286335.ts'
       livepeer_key:
         description: 'مفتاح البث Stream Key من حسابك في Livepeer Studio'
         required: true
@@ -48,14 +48,29 @@ jobs:
             echo "🚀 Connecting IPTV stream to Livepeer RTMP..."
             echo "--------------------------------------------------------"
 
-            curl -s -L -A "VLC/3.0.18 LibVLC/3.0.18" "${{ github.event.inputs.stream_url }}" | \
-              ffmpeg -hide_banner \
-                -f mpegts -i pipe:0 \
-                -c:v copy \
-                -c:a aac -b:a 128k \
-                -f flv "rtmp://rtmp.livepeer.com/live/${{ github.event.inputs.livepeer_key }}" || true
+            # Direct input with high probesize and auto-reconnect
+            ffmpeg -hide_banner \
+              -reconnect 1 \
+              -reconnect_at_eof 1 \
+              -reconnect_streamed 1 \
+              -reconnect_delay_max 5 \
+              -user_agent "VLC/3.0.18 LibVLC/3.0.18" \
+              -analyzeduration 15M -probesize 15M \
+              -i "${{ github.event.inputs.stream_url }}" \
+              -c:v copy \
+              -c:a aac -b:a 128k -ar 44100 \
+              -f flv "rtmp://rtmp.livepeer.com/live/${{ github.event.inputs.livepeer_key }}" || {
+                echo "Direct mode ended, trying buffered pipeline mode..."
+                curl -s -L -A "VLC/3.0.18 LibVLC/3.0.18" "${{ github.event.inputs.stream_url }}" | \
+                  ffmpeg -hide_banner \
+                    -analyzeduration 20M -probesize 20M \
+                    -f mpegts -i pipe:0 \
+                    -c:v copy \
+                    -c:a aac -b:a 128k -ar 44100 \
+                    -f flv "rtmp://rtmp.livepeer.com/live/${{ github.event.inputs.livepeer_key }}" || true
+            }
 
-            echo "Stream connection closed or interrupted. Reconnecting in 3 seconds..."
+            echo "Stream disconnected. Reconnecting in 3 seconds..."
             sleep 3
           done
 
