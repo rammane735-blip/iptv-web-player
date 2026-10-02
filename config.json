@@ -1,12 +1,12 @@
 {
   "admin_password_hash": "$2y$10$wE7/LqgD73W5y019GvR6f.TqR3jR5XmF6x5jTqf4Z/o2/aYf1x4.y",
   "admin_password_plain": "admin123",
-  "site_title": "VIP IPTV Web Player Pro",
-  "announcement": "بث حي ومباشر - beIN SPORTS HD يعمل مباشرة داخل المتصفح وبجودة فائقة وبدون تقطيع",
+  "site_title": "VIP Live Stream & IPTV Web Player",
+  "announcement": "🔴 البث المباشر لمباراة اليوم (OBS Live) يعمل الآن بجودة فائقة وبدون تقطيع!",
   "announcement_active": true,
-  "default_channel_id": "ch_1",
-  "m3u_url": "http://212.70.131.37:8000/play/a080",
-  "last_sync": "2026-10-02 04:00:00",
-  "total_channels": 1,
-  "total_groups": 1
+  "default_channel_id": "ch_1790965852_992",
+  "m3u_url": "https://livepeercdn.studio/hls/73a813ppexsxwzar/index.m3u8",
+  "last_sync": "2026-10-02 20:30:00",
+  "total_channels": 4,
+  "total_groups": 3
 }
