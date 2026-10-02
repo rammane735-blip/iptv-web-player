@@ -95,6 +95,9 @@ if ($action === 'channel_m3u') {
 // باقي الإجراءات الإدارية وواجهة JSON
 session_start();
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 define('CONFIG_FILE', __DIR__ . '/config.json');
 define('CHANNELS_FILE', __DIR__ . '/channels.json');
