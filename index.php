@@ -487,8 +487,12 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
 
             let finalUrl = streamUrl;
             let isHls = streamUrl.toLowerCase().includes('.m3u8');
+            let isHttps = streamUrl.startsWith('https://');
 
-            if (streamMode === 'proxy_ts') {
+            // For HTTPS HLS streams (e.g. Livepeer Studio CDN), direct playback gives fastest speed & 0 server lag
+            if (isHttps && isHls) {
+                finalUrl = streamUrl;
+            } else if (streamMode === 'proxy_ts') {
                 finalUrl = 'api.php?action=proxy&url=' + encodeURIComponent(streamUrl);
             } else if (streamMode === 'direct') {
                 finalUrl = streamUrl;
@@ -555,6 +559,12 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                         window.hlsPlayerInstance.on(Hls.Events.ERROR, function(event, data) {
                             if (data.fatal) {
                                 console.warn("HLS fatal error:", data);
+                                if (finalUrl === streamUrl && !finalUrl.includes('action=proxy')) {
+                                    console.log("Direct HLS error, retrying via server proxy fallback...");
+                                    finalUrl = 'api.php?action=proxy&url=' + encodeURIComponent(streamUrl);
+                                    window.hlsPlayerInstance.loadSource(finalUrl);
+                                    return;
+                                }
                                 if (videoEl.paused || videoEl.readyState < 2) {
                                     showPlayerError();
                                 }
@@ -599,8 +609,8 @@ $announcementActive = !empty($config['announcement_active']) && !empty($announce
                         
                         populateGroupsDropdown(res.groups);
 
-                        // Pick first Arabic / Sports / beIN group if present, or first group
-                        let targetGroup = res.groups.find(g => g.name.includes('BEIN') || g.name.includes('ARAB') || g.name.includes('LALIGA'));
+                        // Pick first Live / Match / Arabic / Sports / beIN group if present, or first group
+                        let targetGroup = res.groups.find(g => g.name.includes('مباشر') || g.name.includes('Match') || g.name.includes('Live') || g.name.includes('BEIN') || g.name.includes('ARAB') || g.name.includes('LALIGA'));
                         if (!targetGroup) targetGroup = res.groups[0];
 
                         document.getElementById('group-filter').value = targetGroup.name;
