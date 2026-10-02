@@ -59,9 +59,55 @@ if ($action === 'proxy') {
     $isM3u8 = (bool)preg_match('/\.m3u8($|\?)/i', $streamUrl);
     if ($isM3u8) {
         header('Content-Type: application/vnd.apple.mpegurl');
-    } else {
-        header('Content-Type: video/mp2t');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $content = curl_exec($ch);
+        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL) ?: $streamUrl;
+        curl_close($ch);
+
+        if ($content === false) {
+            http_response_code(502);
+            die('Error fetching M3U8 playlist');
+        }
+
+        $urlParts = parse_url($effectiveUrl);
+        $scheme = $urlParts['scheme'] ?? 'http';
+        $host = $urlParts['host'] ?? '';
+        $port = !empty($urlParts['port']) ? ':' . $urlParts['port'] : '';
+        $hostRoot = "{$scheme}://{$host}{$port}";
+        $path = $urlParts['path'] ?? '/';
+        $baseDir = $hostRoot . rtrim(dirname($path), '/\\') . '/';
+
+        $lines = preg_split("/\r\n|\n|\r/", $content);
+        $rewritten = [];
+
+        foreach ($lines as $line) {
+            $lineTrim = trim($line);
+            if ($lineTrim === '') continue;
+
+            if ($lineTrim[0] === '#') {
+                if (stripos($lineTrim, 'URI="') !== false) {
+                    $lineTrim = preg_replace_callback('/URI="([^"]+)"/i', function($matches) use ($baseDir, $hostRoot) {
+                        $rawUri = $matches[1];
+                        if (strpos($rawUri, '://') === false) {
+                            $rawUri = ($rawUri[0] === '/') ? ($hostRoot . $rawUri) : ($baseDir . $rawUri);
+                        }
+                        return 'URI="api.php?action=proxy&url=' . urlencode($rawUri) . '"';
+                    }, $lineTrim);
+                }
+                $rewritten[] = $lineTrim;
+            } else {
+                $target = $lineTrim;
+                if (strpos($target, '://') === false) {
+                    $target = ($target[0] === '/') ? ($hostRoot . $target) : ($baseDir . $target);
+                }
+                $rewritten[] = 'api.php?action=proxy&url=' . urlencode($target);
+            }
+        }
+        echo implode("\n", $rewritten);
+        exit;
     }
+
+    header('Content-Type: video/mp2t');
 
     curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) {
         if (connection_aborted()) {
@@ -370,9 +416,98 @@ if ($action === 'delete_channel') {
     }));
 
     if (count($newChannels) < count($channels) && saveJsonData(CHANNELS_FILE, $newChannels)) {
+        $config = getJsonData(CONFIG_FILE, []);
+        $config['total_channels'] = count($newChannels);
+        saveJsonData(CONFIG_FILE, $config);
         sendResponse(true, 'تم حذف القناة بنجاح.');
     } else {
         sendResponse(false, 'لم يتم العثور على القناة.');
+    }
+}
+
+// 8.1 إضافة قناة أو بث مباشر جديد يدوياً
+if ($action === 'add_channel') {
+    $name = trim($_POST['name'] ?? '');
+    $url = trim($_POST['url'] ?? '');
+    $group = trim($_POST['group'] ?? 'عام (General)');
+    $logo = trim($_POST['logo'] ?? '');
+    $position = trim($_POST['position'] ?? 'top'); // 'top' or 'bottom'
+
+    if (empty($name)) {
+        sendResponse(false, 'يرجى كتابة اسم القناة.');
+    }
+    if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+        sendResponse(false, 'يرجى إدخال رابط بث مباشر صحيح (http/https).');
+    }
+
+    $channels = getJsonData(CHANNELS_FILE, []);
+    $newId = "ch_" . time() . "_" . mt_rand(100, 999);
+
+    $newChannel = [
+        'id' => $newId,
+        'name' => $name,
+        'logo' => $logo ?: 'https://placehold.co/100x100/1e293b/38bdf8?text=' . urlencode(mb_substr($name, 0, 4)),
+        'group' => !empty($group) ? $group : 'عام (General)',
+        'url' => $url,
+        'visible' => true
+    ];
+
+    if ($position === 'top') {
+        array_unshift($channels, $newChannel);
+    } else {
+        $channels[] = $newChannel;
+    }
+
+    if (saveJsonData(CHANNELS_FILE, $channels)) {
+        $config = getJsonData(CONFIG_FILE, []);
+        $config['total_channels'] = count($channels);
+        saveJsonData(CONFIG_FILE, $config);
+
+        sendResponse(true, "تمت إضافة قناة \"$name\" بنجاح وهي جاهزة للتشغيل الآن!", [
+            'channel' => $newChannel,
+            'total_channels' => count($channels)
+        ]);
+    } else {
+        sendResponse(false, 'حدث خطأ أثناء حفظ القناة.');
+    }
+}
+
+// 8.2 تعديل بيانات قناة موجودة
+if ($action === 'edit_channel') {
+    $id = trim($_POST['id'] ?? '');
+    $name = trim($_POST['name'] ?? '');
+    $url = trim($_POST['url'] ?? '');
+    $group = trim($_POST['group'] ?? '');
+    $logo = trim($_POST['logo'] ?? '');
+
+    if (empty($id)) {
+        sendResponse(false, 'معرف القناة غير صالح.');
+    }
+    if (empty($name)) {
+        sendResponse(false, 'اسم القناة مطلوب.');
+    }
+    if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+        sendResponse(false, 'رابط البث غير صالح.');
+    }
+
+    $channels = getJsonData(CHANNELS_FILE, []);
+    $found = false;
+
+    foreach ($channels as &$ch) {
+        if ($ch['id'] === $id) {
+            $ch['name'] = $name;
+            $ch['url'] = $url;
+            if (!empty($group)) $ch['group'] = $group;
+            if (!empty($logo)) $ch['logo'] = $logo;
+            $found = true;
+            break;
+        }
+    }
+
+    if ($found && saveJsonData(CHANNELS_FILE, $channels)) {
+        sendResponse(true, 'تم تعديل بيانات القناة بنجاح!');
+    } else {
+        sendResponse(false, 'لم يتم العثور على القناة أو لم تتغير البيانات.');
     }
 }
 
@@ -583,11 +718,73 @@ if ($action === 'sync_m3u') {
         }
     }
 
+    $syncMode = trim($_POST['sync_mode'] ?? 'replace'); // 'replace' or 'append'
+
     if (empty($parsedChannels)) {
-        sendResponse(false, 'لم يتم العثور على أي قنوات صالحة في ملف M3U.');
+        // Smart fallback: check if the user provided a direct single-stream URL (e.g. Magnolia Network, Astra, HLS/TS)
+        $isSingleStream = false;
+        if (!empty($remoteUrl) && filter_var($remoteUrl, FILTER_VALIDATE_URL)) {
+            if (preg_match('/\.(m3u8|ts|mp4|flv)($|\?)/i', $remoteUrl) ||
+                preg_match('#/(play|live|stream)/#i', $remoteUrl) ||
+                stripos($content, '#EXT-X-STREAM-INF') !== false ||
+                stripos($content, '#EXT-X-TARGETDURATION') !== false) {
+                $isSingleStream = true;
+            }
+        }
+
+        if ($isSingleStream) {
+            $pathParts = explode('/', parse_url($remoteUrl, PHP_URL_PATH) ?? '');
+            $rawName = '';
+            for ($k = count($pathParts) - 1; $k >= 0; $k--) {
+                $p = trim($pathParts[$k]);
+                if (!empty($p) && !preg_match('/^(index|live|play|tracks|video|stream)\.(m3u8|ts|mp4)?$/i', $p)) {
+                    $rawName = $p;
+                    break;
+                }
+            }
+            if (empty($rawName)) {
+                $rawName = 'قناة بث مباشر ' . date('H:i');
+            }
+            $cleanName = ucwords(str_replace(['_', '-'], ' ', preg_replace('/\.(m3u8|ts)$/i', '', $rawName)));
+
+            $singleCh = [
+                'id' => 'ch_' . time() . '_' . mt_rand(100, 999),
+                'name' => $cleanName,
+                'logo' => 'https://placehold.co/100x100/1e293b/38bdf8?text=' . urlencode(mb_substr($cleanName, 0, 4)),
+                'group' => 'بث مباشر (Live)',
+                'url' => $remoteUrl,
+                'visible' => true
+            ];
+
+            $currentChannels = ($syncMode === 'replace') ? [] : getJsonData(CHANNELS_FILE, []);
+            array_unshift($currentChannels, $singleCh);
+            saveJsonData(CHANNELS_FILE, $currentChannels);
+
+            $config = getJsonData(CONFIG_FILE, []);
+            $config['last_sync'] = date('Y-m-d H:i:s');
+            $config['m3u_url'] = $remoteUrl;
+            $config['total_channels'] = count($currentChannels);
+            saveJsonData(CONFIG_FILE, $config);
+
+            sendResponse(true, "تم التعرف على الرابط كبث مباشر لقناة \"$cleanName\" وتمت إضافتها بنجاح إلى المشغل!", [
+                'total_imported' => count($currentChannels),
+                'total_groups' => 1,
+                'last_sync' => $config['last_sync'],
+                'channel' => $singleCh
+            ]);
+        }
+
+        sendResponse(false, 'لم يتم العثور على أي قنوات صالحة في ملف M3U. إذا كان الرابط لقناة واحدة فقط، يمكنك استخدام تبويب "إضافة قناة".');
     }
 
-    if (!saveJsonData(CHANNELS_FILE, $parsedChannels)) {
+    if ($syncMode === 'append') {
+        $existing = getJsonData(CHANNELS_FILE, []);
+        $combined = array_merge($existing, $parsedChannels);
+    } else {
+        $combined = $parsedChannels;
+    }
+
+    if (!saveJsonData(CHANNELS_FILE, $combined)) {
         sendResponse(false, 'فشل في حفظ القنوات إلى ملف channels.json');
     }
 
@@ -596,10 +793,11 @@ if ($action === 'sync_m3u') {
     if (!empty($_POST['m3u_url'])) {
         $config['m3u_url'] = trim($_POST['m3u_url']);
     }
+    $config['total_channels'] = count($combined);
     saveJsonData(CONFIG_FILE, $config);
 
     sendResponse(true, 'تمت مزامنة واستيراد القنوات بنجاح!', [
-        'total_imported' => count($parsedChannels),
+        'total_imported' => count($combined),
         'total_groups' => count($groupsFound),
         'last_sync' => $config['last_sync']
     ]);
