@@ -305,14 +305,18 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
         </div>
 
         <!-- أزرار التبويبات -->
-        <div class="flex items-center gap-2 border-b border-white/10 pb-3">
+        <div class="flex items-center gap-2 border-b border-white/10 pb-3 flex-wrap">
             <button onclick="switchTab('channels')" id="tab-btn-channels" class="tab-btn active px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-cyan-500 text-dark-950 shadow-lg shadow-cyan-500/20">
                 <i class="fa-solid fa-tv"></i>
                 <span>إدارة القنوات المرقّمة</span>
             </button>
+            <button onclick="switchTab('add-channel')" id="tab-btn-add-channel" class="tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-dark-900 text-slate-300 hover:text-white border border-white/10">
+                <i class="fa-solid fa-circle-plus text-cyan-400"></i>
+                <span>إضافة بث مباشر / قناة</span>
+            </button>
             <button onclick="switchTab('m3u')" id="tab-btn-m3u" class="tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-dark-900 text-slate-300 hover:text-white border border-white/10">
-                <i class="fa-solid fa-cloud-arrow-down"></i>
-                <span>مزامنة وتغيير رابط M3U</span>
+                <i class="fa-solid fa-cloud-arrow-down text-blue-400"></i>
+                <span>مزامنة وتغيير سيرفر M3U</span>
             </button>
             <button onclick="switchTab('settings')" id="tab-btn-settings" class="tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-dark-900 text-slate-300 hover:text-white border border-white/10">
                 <i class="fa-solid fa-gear"></i>
@@ -362,8 +366,12 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
                     </div>
                 </div>
 
-                <!-- الإجراءات الجماعية -->
+                <!-- الإجراءات الجماعية وإضافة قناة -->
                 <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                    <button onclick="switchTab('add-channel')" class="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-dark-950 text-xs font-black transition flex items-center gap-1.5 shadow-md shadow-cyan-500/20">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>إضافة قناة جديدة</span>
+                    </button>
                     <button onclick="toggleBulkVisibility('show_all')" class="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition flex items-center gap-1.5">
                         <i class="fa-solid fa-eye"></i>
                         <span>إظهار الكل</span>
@@ -430,7 +438,117 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
         </div>
 
         <!-- ======================================================== -->
-        <!-- 2. لوحة مزامنة وتغيير رابط M3U (M3U Source Management Tab) -->
+        <!-- 2. لوحة إضافة قناة أو بث مباشر جديد يدوياً (Add Channel Tab) -->
+        <!-- ======================================================== -->
+        <div id="tab-content-add-channel" class="tab-content hidden space-y-6">
+            
+            <div class="bg-dark-900 border border-white/10 rounded-2xl p-6 sm:p-8 max-w-3xl">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="size-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-circle-plus"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-lg text-white">إضافة قناة أو رابط بث مباشر (Live Stream)</h3>
+                        <p class="text-xs text-slate-400">أضف أي رابط بث مباشر لمشاهدته فوراً داخل مشغل الموقع (يدعم .m3u8 و .ts وروابط Astra)</p>
+                    </div>
+                </div>
+
+                <form id="add-channel-form" onsubmit="handleAddChannel(event)" class="space-y-5">
+                    
+                    <!-- اسم القناة -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">
+                            اسم القناة <span class="text-red-400">*</span>
+                        </label>
+                        <input type="text" 
+                               id="add-ch-name" 
+                               required 
+                               placeholder="مثال: Magnolia Network, beIN Sports 1 HD, الجزيرة..."
+                               class="w-full bg-dark-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500">
+                    </div>
+
+                    <!-- رابط البث المباشر -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">
+                            رابط البث المباشر (Live Stream URL) <span class="text-red-400">*</span>
+                        </label>
+                        <div class="relative">
+                            <i class="fa-solid fa-play absolute right-3.5 top-1/2 -translate-y-1/2 text-cyan-400 text-xs"></i>
+                            <input type="url" 
+                                   id="add-ch-url" 
+                                   required 
+                                   placeholder="http://190.197.41.183/MAGNOLIA_NETWORK/index.m3u8 أو http://server:8000/play/..."
+                                   class="w-full bg-dark-800 border border-white/10 rounded-xl pr-10 pl-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono">
+                        </div>
+                        <span class="text-[11px] text-slate-400 mt-1 block">
+                            يدعم جميع صيغ البث: HLS (.m3u8)، MPEG-TS (.ts)، Astra، Xtream، أو أي سيرفر بث حي.
+                        </span>
+                    </div>
+
+                    <!-- الباقة والشعار -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1.5">
+                                الباقة / التصنيف (Group)
+                            </label>
+                            <input type="text" 
+                                   id="add-ch-group" 
+                                   placeholder="اختر أو اكتب باقة جديدة..."
+                                   list="existing-groups-datalist"
+                                   value="عام (General)"
+                                   class="w-full bg-dark-800 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            <datalist id="existing-groups-datalist"></datalist>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1.5">
+                                رابط شعار القناة (Logo URL - اختياري)
+                            </label>
+                            <input type="url" 
+                                   id="add-ch-logo" 
+                                   placeholder="https://example.com/logo.png"
+                                   class="w-full bg-dark-800 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500">
+                        </div>
+                    </div>
+
+                    <!-- مكان القناة -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-2">ترتيب ومكان القناة في المشغل:</label>
+                        <div class="flex items-center gap-6 text-xs text-slate-300">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="add_ch_position" value="top" checked class="text-cyan-500 focus:ring-0">
+                                <span class="font-bold text-cyan-400">في أول القائمة (لتشغيلها كقناة أولى رئيسية فوراً)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="add_ch_position" value="bottom" class="text-cyan-500 focus:ring-0">
+                                <span>في آخر القائمة</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="add-channel-msg" class="hidden p-3.5 rounded-xl text-xs font-bold text-center"></div>
+
+                    <div class="flex items-center gap-3 pt-2">
+                        <button type="submit" 
+                                id="add-channel-btn"
+                                class="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-dark-950 font-black text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>حفظ وإضافة القناة للمشغل</span>
+                        </button>
+                        <a href="index.php" target="_blank" class="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition flex items-center gap-2">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-cyan-400"></i>
+                            <span>معاينة في المشغل</span>
+                        </a>
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- 3. لوحة مزامنة وتغيير رابط M3U (M3U Source Management Tab) -->
         <!-- ======================================================== -->
         <div id="tab-content-m3u" class="tab-content hidden space-y-6">
             
@@ -440,8 +558,16 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
                         <i class="fa-solid fa-cloud-arrow-down"></i>
                     </div>
                     <div>
-                        <h3 class="font-extrabold text-lg text-white">تغيير ومزامنة رابط سيرفر M3U</h3>
-                        <p class="text-xs text-slate-400">يمكنك وضع أي رابط M3U لسيرفرك وسيقوم النظام بجلب القنوات فوراً</p>
+                        <h3 class="font-extrabold text-lg text-white">تغيير ومزامنة سيرفر M3U أو بث مباشر</h3>
+                        <p class="text-xs text-slate-400">يمكنك وضع رابط M3U كامل أو رابط بث مباشر مفرد وسيتم التعرف عليه تلقائياً</p>
+                    </div>
+                </div>
+
+                <!-- نصيحة إرشادية ذكية -->
+                <div class="mb-5 p-3.5 bg-cyan-950/30 border border-cyan-500/20 rounded-xl text-xs text-cyan-200 flex items-start gap-2.5">
+                    <i class="fa-solid fa-circle-info text-cyan-400 mt-0.5 text-sm"></i>
+                    <div class="leading-relaxed">
+                        <strong>نصيحة:</strong> يدعم هذا القسم روابط ملفات <strong>M3U الكاملة</strong>، وأيضاً <strong>روابط البث المباشر المفردة</strong> (مثل روابط .m3u8 أو .ts). إذا أردت إضافة قناة واحدة وتحديد اسمها بنفسك، يمكنك استخدام تبويب <strong class="text-white">"إضافة بث مباشر / قناة"</strong> في الأعلى.
                     </div>
                 </div>
 
@@ -450,7 +576,7 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
                     <!-- إدخال وتعديل رابط M3U -->
                     <div>
                         <label class="block text-xs font-bold text-slate-300 mb-1.5">
-                            رابط قائمة M3U المباشر لسيرفرك (Remote M3U URL)
+                            رابط قائمة M3U أو رابط البث المباشر (Remote URL)
                         </label>
                         <div class="relative">
                             <i class="fa-solid fa-link absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
@@ -459,12 +585,27 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
                                    name="m3u_url"
                                    required
                                    value="<?= $m3uUrl ?>" 
-                                   placeholder="http://server.top:8080/get.php?username=...&password=...&type=m3u_plus" 
+                                   placeholder="http://server.top:8080/get.php?username=...&password=... أو http://.../index.m3u8" 
                                    class="w-full bg-dark-800 border border-white/10 rounded-xl pr-10 pl-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono">
                         </div>
                         <span class="text-[11px] text-slate-400 mt-1 block">
-                            قم بنسخ رابط الـ M3U الخاص باشتراكك هنا ثم اضغط على زر المزامنة بالأسفل.
+                            قم بنسخ رابط الـ M3U أو رابط القناة المباشرة هنا ثم اضغط على زر المزامنة بالأسفل.
                         </span>
+                    </div>
+
+                    <!-- خيار وضع المزامنة (دمج أم استبدال) -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-2">طريقة حفظ القنوات:</label>
+                        <div class="flex items-center gap-6 text-xs text-slate-300">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="sync_mode" value="replace" checked class="text-cyan-500 focus:ring-0">
+                                <span class="font-bold text-white">استبدال القنوات الحالية (مسح القديم ووضع الجديد)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="sync_mode" value="append" class="text-cyan-500 focus:ring-0">
+                                <span class="text-slate-300">إضافة ودمج مع القنوات الحالية (دون حذف القديم)</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="relative flex py-2 items-center">
@@ -615,6 +756,61 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
                 </button>
             </div>
 
+    </div>
+
+    <!-- مودال تعديل بيانات القناة -->
+    <div id="edit-modal" class="fixed inset-0 bg-dark-950/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-dark-900 border border-white/10 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+            
+            <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
+                <div class="flex items-center gap-2.5">
+                    <div class="size-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-base">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </div>
+                    <h4 class="font-extrabold text-sm sm:text-base text-white">تعديل بيانات القناة</h4>
+                </div>
+                <button onclick="closeEditModal()" class="size-8 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="edit-channel-form" onsubmit="handleEditChannel(event)" class="space-y-4">
+                <input type="hidden" id="edit-ch-id" name="id">
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">اسم القناة</label>
+                    <input type="text" id="edit-ch-name" name="name" required class="w-full bg-dark-800 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">رابط البث المباشر (Stream URL)</label>
+                    <input type="url" id="edit-ch-url" name="url" required class="w-full bg-dark-800 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">الباقة / التصنيف</label>
+                        <input type="text" id="edit-ch-group" name="group" list="existing-groups-datalist" class="w-full bg-dark-800 border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">شعار القناة (رابط الصورة)</label>
+                        <input type="url" id="edit-ch-logo" name="logo" class="w-full bg-dark-800 border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+
+                <div id="edit-channel-msg" class="hidden p-3 rounded-xl text-xs font-bold text-center"></div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-white/10">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition">
+                        إلغاء
+                    </button>
+                    <button type="submit" id="save-edit-btn" class="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-dark-950 font-black text-xs transition flex items-center gap-1.5 shadow-md shadow-cyan-500/20">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>حفظ التعديلات</span>
+                    </button>
+                </div>
+            </form>
+
         </div>
     </div>
 
@@ -657,12 +853,20 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
                         document.getElementById('kpi-groups').textContent = res.groups.length.toLocaleString();
 
                         const groupSelect = document.getElementById('admin-group-filter');
+                        const dataList = document.getElementById('existing-groups-datalist');
                         groupSelect.innerHTML = '<option value="">جميع الباقات (الكل)</option>';
+                        if (dataList) dataList.innerHTML = '';
                         res.groups.forEach(g => {
                             const opt = document.createElement('option');
                             opt.value = g.name;
                             opt.textContent = `${g.name} (${g.total})`;
                             groupSelect.appendChild(opt);
+
+                            if (dataList) {
+                                const dlOpt = document.createElement('option');
+                                dlOpt.value = g.name;
+                                dataList.appendChild(dlOpt);
+                            }
                         });
                     }
                 })
@@ -749,6 +953,9 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
                         <div class="flex items-center justify-center gap-1.5">
                             <button onclick="previewStream('${escapeHtml(ch.name)}', '${escapeHtml(ch.url)}')" title="معاينة البث" class="size-8 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 flex items-center justify-center transition">
                                 <i class="fa-solid fa-play text-xs"></i>
+                            </button>
+                            <button onclick="openEditModal('${ch.id}', '${escapeHtml(ch.name)}', '${escapeHtml(ch.url)}', '${escapeHtml(ch.group || '')}', '${escapeHtml(ch.logo || '')}')" title="تعديل القناة" class="size-8 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 flex items-center justify-center transition">
+                                <i class="fa-solid fa-pen-to-square text-xs"></i>
                             </button>
                             <button onclick="deleteChannel('${ch.id}')" title="حذف القناة" class="size-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition">
                                 <i class="fa-solid fa-trash-can text-xs"></i>
@@ -936,6 +1143,112 @@ $m3uUrl = htmlspecialchars($config['m3u_url'] ?? '');
                         statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold text-center bg-red-500/10 border border-red-500/30 text-red-400 block';
                         statusMsg.textContent = res.message;
                     }
+                });
+        }
+
+        function handleAddChannel(e) {
+            e.preventDefault();
+            const btn = document.getElementById('add-channel-btn');
+            const msg = document.getElementById('add-channel-msg');
+            const name = document.getElementById('add-ch-name').value.trim();
+            const url = document.getElementById('add-ch-url').value.trim();
+            const group = document.getElementById('add-ch-group').value.trim();
+            const logo = document.getElementById('add-ch-logo').value.trim();
+            const position = document.querySelector('input[name="add_ch_position"]:checked')?.value || 'top';
+
+            if (!name || !url) {
+                alert('يرجى ملء اسم القناة ورابط البث.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> جاري إضافة القناة...';
+            msg.classList.add('hidden');
+
+            const fd = new FormData();
+            fd.append('action', 'add_channel');
+            fd.append('name', name);
+            fd.append('url', url);
+            fd.append('group', group);
+            fd.append('logo', logo);
+            fd.append('position', position);
+
+            fetch('api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-plus"></i> حفظ وإضافة القناة للمشغل';
+                    msg.classList.remove('hidden');
+
+                    if (res.success) {
+                        msg.className = 'p-3.5 rounded-xl text-xs font-bold text-center bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 block';
+                        msg.innerHTML = `<i class="fa-solid fa-circle-check ml-1"></i> ${res.message}`;
+                        document.getElementById('add-ch-name').value = '';
+                        document.getElementById('add-ch-url').value = '';
+                        document.getElementById('add-ch-logo').value = '';
+                        loadKpisAndGroups();
+                        fetchAdminChannels(1);
+                    } else {
+                        msg.className = 'p-3.5 rounded-xl text-xs font-bold text-center bg-red-500/10 border border-red-500/30 text-red-400 block';
+                        msg.innerHTML = `<i class="fa-solid fa-triangle-exclamation ml-1"></i> ${res.message}`;
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-plus"></i> حفظ وإضافة القناة للمشغل';
+                    msg.className = 'p-3.5 rounded-xl text-xs font-bold text-center bg-red-500/10 border border-red-500/30 text-red-400 block';
+                    msg.textContent = 'حدث خطأ: ' + err;
+                });
+        }
+
+        function openEditModal(id, name, url, group, logo) {
+            document.getElementById('edit-ch-id').value = id;
+            document.getElementById('edit-ch-name').value = name;
+            document.getElementById('edit-ch-url').value = url;
+            document.getElementById('edit-ch-group').value = group || 'عام (General)';
+            document.getElementById('edit-ch-logo').value = logo || '';
+            document.getElementById('edit-channel-msg').classList.add('hidden');
+            document.getElementById('edit-modal').classList.replace('hidden', 'flex');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.replace('flex', 'hidden');
+        }
+
+        function handleEditChannel(e) {
+            e.preventDefault();
+            const btn = document.getElementById('save-edit-btn');
+            const msg = document.getElementById('edit-channel-msg');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> جاري الحفظ...';
+
+            const fd = new FormData(document.getElementById('edit-channel-form'));
+            fd.append('action', 'edit_channel');
+
+            fetch('api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(res => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> حفظ التعديلات';
+                    msg.classList.remove('hidden');
+
+                    if (res.success) {
+                        msg.className = 'p-3 rounded-xl text-xs font-bold text-center bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 block';
+                        msg.textContent = res.message;
+                        fetchAdminChannels(currentPage);
+                        loadKpisAndGroups();
+                        setTimeout(() => closeEditModal(), 1200);
+                    } else {
+                        msg.className = 'p-3 rounded-xl text-xs font-bold text-center bg-red-500/10 border border-red-500/30 text-red-400 block';
+                        msg.textContent = res.message;
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> حفظ التعديلات';
+                    msg.className = 'p-3 rounded-xl text-xs font-bold text-center bg-red-500/10 border border-red-500/30 text-red-400 block';
+                    msg.textContent = 'حدث خطأ: ' + err;
                 });
         }
 
