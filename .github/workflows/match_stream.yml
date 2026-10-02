@@ -1,0 +1,59 @@
+name: 🔴 Start Match Cloud Stream
+
+on:
+  workflow_dispatch:
+    inputs:
+      stream_url:
+        description: 'رابط القناة من سيرفر الـ IPTV'
+        required: true
+        default: 'http://sma3.cc:3350/532275452803140/23072187/304'
+      livepeer_key:
+        description: 'مفتاح البث Stream Key من حسابك في Livepeer Studio'
+        required: true
+        default: ''
+      max_hours:
+        description: 'مدة البث بالساعات (افتراضي: 3 ساعات للمباراة والشوطين)'
+        required: true
+        default: '3'
+
+jobs:
+  cloud_stream:
+    name: ⚽ Cloud Restream to Livepeer
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: ⚙️ Setup FFmpeg and Network Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg
+
+      - name: 🚀 Start Cloud Stream to Livepeer (No PC / No OBS Needed)
+        run: |
+          echo "=========================================================="
+          echo "⚽ Starting Cloud Restream from IPTV to Livepeer..."
+          echo "IPTV URL: ${{ github.event.inputs.stream_url }}"
+          echo "Duration Limit: ${{ github.event.inputs.max_hours }} Hours"
+          echo "=========================================================="
+
+          # Calculate timeout in seconds
+          HOURS="${{ github.event.inputs.max_hours }}"
+          SECONDS_LIMIT=$(python3 -c "print(int(float('$HOURS') * 3600))")
+          
+          echo "Stream will run for up to $SECONDS_LIMIT seconds ($HOURS hours)."
+
+          # Run FFmpeg with automatic reconnect and direct stream copy
+          timeout $SECONDS_LIMIT ffmpeg -hide_banner \
+            -reconnect 1 \
+            -reconnect_at_eof 1 \
+            -reconnect_streamed 1 \
+            -reconnect_delay_max 5 \
+            -user_agent "VLC/3.0.18 LibVLC/3.0.18" \
+            -i "${{ github.event.inputs.stream_url }}" \
+            -c:v copy \
+            -c:a copy \
+            -f flv "rtmp://rtmp.livepeer.com/live/${{ github.event.inputs.livepeer_key }}" || true
+
+          echo "=========================================================="
+          echo "✅ Match Stream session finished successfully."
+          echo "=========================================================="
